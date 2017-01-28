@@ -15,12 +15,18 @@
 #define SYSFS_ADC_DEV "/sys/devices/bone_capemgr.9/slots"
 #define MAX_BUF 64
 
+#define STATUS_RELEASE	0
+#define STATUS_PRESS	1
+
+
 /* ADC device file names */
 static char *_adcChStrP[SYSFS_ADC_DIR_CHMAX] = { NULL };
 
 #define THREASHOLD_GND		2500
 #define THREASHOLD_VALID	4000
-#define THREASHOLD	1
+#define FLT_CNT_PRESS		2
+#define FLT_CNT_RELEASE		3
+#define FLT_CNT_INIT		0
 
 /* Get ADC channel value 0~4095 */
 int adcGetChVal(int ch)
@@ -28,7 +34,7 @@ int adcGetChVal(int ch)
 	char adcChStr[10]; 		/* String ADC value */
 	int adcChStrLen = 0; 	/* String ADC value length */
 	int adcChInt = 0; 		/* Integer ADC value */
-	FILE *fd = NULL; 		/* Point to ADC device file */
+	FILE *fd = NULL; 		/* Point to ADC device` file */
 	int idx = 0;
 
 	fd = fopen(_adcChStrP[ch], "r+");
@@ -106,17 +112,21 @@ void adcInit(void)
 
 void adcTest(void)
 {
-	int sysCallRtn = 0xffff;
 	int x;
 	char adcStatus[SYSFS_ADC_DIR_CHMAX] =
-	{ 0, 0, 0, 0, 0, 0 };
-	char adcStatusCnt[SYSFS_ADC_DIR_CHMAX] =
-	{ 0, 0, 0, 0, 0, 0 };
+	{ STATUS_RELEASE, STATUS_RELEASE, STATUS_RELEASE,
+		STATUS_RELEASE, STATUS_RELEASE, STATUS_RELEASE };
+	char adcPressCnt[SYSFS_ADC_DIR_CHMAX] =
+	{ FLT_CNT_INIT, FLT_CNT_INIT, FLT_CNT_INIT,
+		FLT_CNT_INIT, FLT_CNT_INIT, FLT_CNT_INIT };
+	char adcReleaseCnt[SYSFS_ADC_DIR_CHMAX] =
+	{ FLT_CNT_INIT, FLT_CNT_INIT, FLT_CNT_INIT,
+		FLT_CNT_INIT, FLT_CNT_INIT, FLT_CNT_INIT };
 	int adcChIdx = 0;
 
 	adcInit();
 
-	while (1)
+	for (;;)
 	{
 		for (adcChIdx = 0; adcChIdx < SYSFS_ADC_DIR_CHMAX; adcChIdx++)
 		{
@@ -126,7 +136,7 @@ void adcTest(void)
 //			printf("[%4f] ",adc);
 			if (x < THREASHOLD_GND)
 			{
-				printf("------------------------%d:%d \n", adcChIdx, x);
+				//printf("------------------------%d:%d \n", adcChIdx, x);
 			}
 			else
 			{
@@ -135,17 +145,18 @@ void adcTest(void)
 //			if (6 == adcChIdx)
 //			{ printf("\n"); }
 
-			if ((x < THREASHOLD_GND) && (adcStatus[adcChIdx] == 0))
+			if ((x < THREASHOLD_GND) && (adcStatus[adcChIdx] == STATUS_RELEASE))
 			{
 				char *musicP = NULL;
-				if (THREASHOLD != adcStatusCnt[adcChIdx])
+				if (FLT_CNT_PRESS > adcPressCnt[adcChIdx])
 				{
-					adcStatusCnt[adcChIdx]++;
+					adcPressCnt[adcChIdx]++;
 				}
-				if (THREASHOLD == adcStatusCnt[adcChIdx])
+				if (FLT_CNT_PRESS == adcPressCnt[adcChIdx])
 				{
-					adcStatus[adcChIdx] = 1;
-					//printf("[%d] ON[%d]\n", adcChIdx, x);
+					adcStatus[adcChIdx] = STATUS_PRESS;
+					adcReleaseCnt[adcChIdx] = FLT_CNT_INIT;
+					printf("[%d] ON[%d]\n", adcChIdx, x);
 					switch (adcChIdx)
 					{
 					case 0:
@@ -174,26 +185,35 @@ void adcTest(void)
 						break;
 					}
 					printf("playing: %s\n", musicP);
-					sysCallRtn = system(musicP);
+					system(musicP);
+				}
+			}
+			if ((x < THREASHOLD_GND) && (adcStatus[adcChIdx] == STATUS_PRESS))
+			{
+				adcReleaseCnt[adcChIdx] = FLT_CNT_INIT;
+			}
+			else if ((x >= THREASHOLD_GND) && (x <= THREASHOLD_VALID)
+					&& (adcStatus[adcChIdx] == STATUS_PRESS))
+			{
+				if (FLT_CNT_RELEASE > adcReleaseCnt[adcChIdx])
+				{
+					adcReleaseCnt[adcChIdx]++;
+				}
+				if (FLT_CNT_RELEASE == adcReleaseCnt[adcChIdx])
+				{
+					adcStatus[adcChIdx] = STATUS_RELEASE;
+					adcPressCnt[adcChIdx] = FLT_CNT_INIT;
+					printf("[%d] OFF[%d]\n", adcChIdx, x);
 				}
 			}
 			else if ((x >= THREASHOLD_GND) && (x <= THREASHOLD_VALID)
-					&& (adcStatus[adcChIdx] == 1))
+					&& (adcStatus[adcChIdx] == STATUS_RELEASE))
 			{
-				if (0 != adcStatusCnt[adcChIdx])
-				{
-					adcStatusCnt[adcChIdx]--;
-				}
-				if (0 == adcStatusCnt[adcChIdx])
-				{
-					adcStatus[adcChIdx] = 0;
-					//printf("[%d] OFF[%d]\n", adcChIdx, x);
-				}
+				adcPressCnt[adcChIdx] = FLT_CNT_INIT;
 			}
 
 			usleep(1000);
 		}
-		//printf("\n");
 	}
 
 }
@@ -266,9 +286,9 @@ void adcTest(void)
 			if ((x < THREASHOLD_GND) && (adcStatus[adcChIdx] == 0))
 			{
 				char *musicP = NULL;
-				if (THREASHOLD != adcStatusCnt[adcChIdx])
+				if (FLT_CNT_PRESS != adcStatusCnt[adcChIdx])
 				{	adcStatusCnt[adcChIdx]++;}
-				if (THREASHOLD == adcStatusCnt[adcChIdx])
+				if (FLT_CNT_PRESS == adcStatusCnt[adcChIdx])
 				{
 					adcStatus[adcChIdx] = 1;
 					//printf("[%d] ON[%d]\n", adcChIdx, x);
