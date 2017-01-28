@@ -15,77 +15,118 @@
 #define SYSFS_ADC_DEV "/sys/devices/bone_capemgr.9/slots"
 #define MAX_BUF 64
 
-#define THREAD_VAL		3500
+/* ADC device file names */
+static char *_adcChStrP[SYSFS_ADC_DIR_CHMAX] = { NULL };
+
+#define THREASHOLD_GND		2500
+#define THREASHOLD_VALID	4000
 #define THREASHOLD	1
 
-static int _getAdcChVal(int ch)
+/* Get ADC channel value 0~4095 */
+int adcGetChVal(int ch)
 {
-    FILE  *fd=NULL;
-    char a[10];
-    int x;
+	char adcChStr[10]; 		/* String ADC value */
+	int adcChStrLen = 0; 	/* String ADC value length */
+	int adcChInt = 0; 		/* Integer ADC value */
+	FILE *fd = NULL; 		/* Point to ADC device file */
+	int idx = 0;
 
-    char *adcChStrP[SYSFS_ADC_DIR_CHMAX] = {NULL};
+	fd = fopen(_adcChStrP[ch], "r+");
+	fscanf(fd, "%s", adcChStr);
 
-    adcChStrP[0] = SYSFS_ADC_DIR_CH0;
-    adcChStrP[1] = SYSFS_ADC_DIR_CH1;
-    adcChStrP[2] = SYSFS_ADC_DIR_CH2;
-    adcChStrP[3] = SYSFS_ADC_DIR_CH3;
-    adcChStrP[4] = SYSFS_ADC_DIR_CH4;
-    adcChStrP[5] = SYSFS_ADC_DIR_CH5;
-    adcChStrP[6] = SYSFS_ADC_DIR_CH6;
+	/* Record ADC value string length */
+	adcChStrLen = strlen(adcChStr);
 
-	fd=fopen(adcChStrP[ch],"r+");
-	fscanf(fd,"%s",a);
-//			printf("%s",a);
-	if(strlen(a)==4)
+	/* Translate character into number */
+	for (idx = 0; idx < adcChStrLen; idx++)
 	{
-		x=((int)a[0]-48)*1000+((int)a[1]-48)*100+((int)a[2]-48)*10+((int)a[3]-48);
+		/* Invalid character */
+		if (('\0' != adcChStr[idx]) &&
+			(('0' > adcChStr[idx]) ||
+			('9' < adcChStr[idx])))
+		{
+			adcChStrLen = 0;
+			break;
+		}
+		/* Character to number */
+		else
+		{ adcChStr[idx] -= '0'; }
 	}
-	else if(strlen(a)==3)
+
+	/* Make up the int value */
+	switch (adcChStrLen)
 	{
-		x=((int)a[0]-48)*100+((int)a[1]-48)*10+((int)a[2]-48);
+		case 4:
+			adcChInt = adcChStr[0] * 1000 + adcChStr[1] * 100
+					+ adcChStr[2] * 10 + adcChStr[3];
+			break;
+		case 3:
+			adcChInt = adcChStr[0] * 100 + adcChStr[1] * 10
+					+ adcChStr[2];
+			break;
+		case 2:
+			adcChInt = adcChStr[0] * 10 + adcChStr[1];
+			break;
+		case 1:
+			adcChInt = adcChStr[0];
+			break;
+		default:
+			adcChInt = THREASHOLD_VALID + 1; /* Invalid */
+			break;
 	}
-	else if(strlen(a)==2)
-	{
-		x=((int)a[0]-48)*10+((int)a[1]-48);
-	}
-	else
-	{
-		x=((int)a[0]-48);
-	}
+
 	fclose(fd);
 
-	return x;
+	return adcChInt;
+}
+
+/* ADC initialization */
+void adcInit(void)
+{
+	FILE *fd = NULL;
+
+	_adcChStrP[0] = SYSFS_ADC_DIR_CH0;
+	_adcChStrP[1] = SYSFS_ADC_DIR_CH1;
+	_adcChStrP[2] = SYSFS_ADC_DIR_CH2;
+	_adcChStrP[3] = SYSFS_ADC_DIR_CH3;
+	_adcChStrP[4] = SYSFS_ADC_DIR_CH4;
+	_adcChStrP[5] = SYSFS_ADC_DIR_CH5;
+	_adcChStrP[6] = SYSFS_ADC_DIR_CH6;
+
+
+	fd = fopen(SYSFS_ADC_DIR_CH0, "w");
+	if (fd == NULL) /* Load ADC if it is not loaded*/
+	{
+		fd = fopen(SYSFS_ADC_DEV, "w");
+		fwrite("BB-ADC", sizeof(int), 6, fd); /* "BB-ADC" has 6 characters */
+		fclose(fd);
+	}
+
 }
 
 void adcTest(void)
 {
 	int sysCallRtn = 0xffff;
-    FILE  *fd=NULL;
-    int x;
-    char adcStatus[SYSFS_ADC_DIR_CHMAX] = {0,0,0,0,0,0};
-    char adcStatusCnt[SYSFS_ADC_DIR_CHMAX] = {0,0,0,0,0,0};
-    int adcChIdx = 0;
+	int x;
+	char adcStatus[SYSFS_ADC_DIR_CHMAX] =
+	{ 0, 0, 0, 0, 0, 0 };
+	char adcStatusCnt[SYSFS_ADC_DIR_CHMAX] =
+	{ 0, 0, 0, 0, 0, 0 };
+	int adcChIdx = 0;
 
-    fd=fopen(SYSFS_ADC_DIR_CH0,"w");
-    if (fd==NULL)     /* Load ADC if it is not loaded*/
-    {
-        fd=fopen(SYSFS_ADC_DEV,"w");
-        fwrite("BB-ADC",sizeof(int),6,fd);   /* "BB-ADC" has 6 characters */
-        fclose(fd);
-    }
+	adcInit();
 
-    while(1)
-    {
-    	for (adcChIdx = 0; adcChIdx < SYSFS_ADC_DIR_CHMAX; adcChIdx++)
+	while (1)
+	{
+		for (adcChIdx = 0; adcChIdx < SYSFS_ADC_DIR_CHMAX; adcChIdx++)
 		{
 
-    		x = _getAdcChVal(adcChIdx);
+			x = adcGetChVal(adcChIdx);
 //			adc=((float)x/4095.0)*1.8;
 //			printf("[%4f] ",adc);
-			if (x < THREAD_VAL)
+			if (x < THREASHOLD_GND)
 			{
-				printf("-%d:%d \n", adcChIdx, x);
+				printf("------------------------%d:%d \n", adcChIdx, x);
 			}
 			else
 			{
@@ -94,11 +135,13 @@ void adcTest(void)
 //			if (6 == adcChIdx)
 //			{ printf("\n"); }
 
-			if ((x < THREAD_VAL) && (adcStatus[adcChIdx] == 0))
+			if ((x < THREASHOLD_GND) && (adcStatus[adcChIdx] == 0))
 			{
 				char *musicP = NULL;
 				if (THREASHOLD != adcStatusCnt[adcChIdx])
-				{ adcStatusCnt[adcChIdx]++; }
+				{
+					adcStatusCnt[adcChIdx]++;
+				}
 				if (THREASHOLD == adcStatusCnt[adcChIdx])
 				{
 					adcStatus[adcChIdx] = 1;
@@ -134,10 +177,13 @@ void adcTest(void)
 					sysCallRtn = system(musicP);
 				}
 			}
-			else if ((x >= THREAD_VAL) && (x != 4095) && (adcStatus[adcChIdx] == 1))
+			else if ((x >= THREASHOLD_GND) && (x <= THREASHOLD_VALID)
+					&& (adcStatus[adcChIdx] == 1))
 			{
 				if (0 != adcStatusCnt[adcChIdx])
-				{ adcStatusCnt[adcChIdx]--; }
+				{
+					adcStatusCnt[adcChIdx]--;
+				}
 				if (0 == adcStatusCnt[adcChIdx])
 				{
 					adcStatus[adcChIdx] = 0;
@@ -147,42 +193,45 @@ void adcTest(void)
 
 			usleep(1000);
 		}
-    	//printf("\n");
-    }
+		//printf("\n");
+	}
 
 }
 #if 0
 {
-    FILE  *fd=NULL;
-    char a[10];
-    int x;
-    float adc;
-    char *adcChStrP[SYSFS_ADC_DIR_CHMAX] = {NULL};
-    char adcStatus[SYSFS_ADC_DIR_CHMAX] = {0,0,0,0,0,0};
-    char adcStatusCnt[SYSFS_ADC_DIR_CHMAX] = {0,0,0,0,0,0};
-    char adcChIdx = 0;
+	FILE *fd=NULL;
+	char a[10];
+	int x;
+	float adc;
+	char *_adcChStrP[SYSFS_ADC_DIR_CHMAX] =
+	{	NULL};
+	char adcStatus[SYSFS_ADC_DIR_CHMAX] =
+	{	0,0,0,0,0,0};
+	char adcStatusCnt[SYSFS_ADC_DIR_CHMAX] =
+	{	0,0,0,0,0,0};
+	char adcChIdx = 0;
 
-    adcChStrP[0] = SYSFS_ADC_DIR_CH0;
-    adcChStrP[1] = SYSFS_ADC_DIR_CH1;
-    adcChStrP[2] = SYSFS_ADC_DIR_CH2;
-    adcChStrP[3] = SYSFS_ADC_DIR_CH3;
-    adcChStrP[4] = SYSFS_ADC_DIR_CH4;
-    adcChStrP[5] = SYSFS_ADC_DIR_CH5;
-    adcChStrP[6] = SYSFS_ADC_DIR_CH6;
+	_adcChStrP[0] = SYSFS_ADC_DIR_CH0;
+	_adcChStrP[1] = SYSFS_ADC_DIR_CH1;
+	_adcChStrP[2] = SYSFS_ADC_DIR_CH2;
+	_adcChStrP[3] = SYSFS_ADC_DIR_CH3;
+	_adcChStrP[4] = SYSFS_ADC_DIR_CH4;
+	_adcChStrP[5] = SYSFS_ADC_DIR_CH5;
+	_adcChStrP[6] = SYSFS_ADC_DIR_CH6;
 
-    fd=fopen(SYSFS_ADC_DIR_CH0,"w");
-    if (fd==NULL)     /* Load ADC if it is not loaded*/
-    {
-        fd=fopen(SYSFS_ADC_DEV,"w");
-        fwrite("BB-ADC",sizeof(int),6,fd);   /* "BB-ADC" has 6 characters */
-        fclose(fd);
-    }
+	fd=fopen(SYSFS_ADC_DIR_CH0,"w");
+	if (fd==NULL) /* Load ADC if it is not loaded*/
+	{
+		fd=fopen(SYSFS_ADC_DEV,"w");
+		fwrite("BB-ADC",sizeof(int),6,fd); /* "BB-ADC" has 6 characters */
+		fclose(fd);
+	}
 
-    while(1)
-    {
-    	for (adcChIdx = 0; adcChIdx < SYSFS_ADC_DIR_CHMAX; adcChIdx++)
+	while(1)
+	{
+		for (adcChIdx = 0; adcChIdx < SYSFS_ADC_DIR_CHMAX; adcChIdx++)
 		{
-			fd=fopen(adcChStrP[adcChIdx],"r+");
+			fd=fopen(_adcChStrP[adcChIdx],"r+");
 			fscanf(fd,"%s",a);
 //			printf("%s",a);
 			if(strlen(a)==4)
@@ -203,7 +252,7 @@ void adcTest(void)
 			}
 //			adc=((float)x/4095.0)*1.8;
 //			printf("[%4f] ",adc);
-			if (x < THREAD_VAL)
+			if (x < THREASHOLD_GND)
 			{
 				printf("-%d:%dx \n", adcChIdx, x);
 			}
@@ -214,48 +263,48 @@ void adcTest(void)
 //			if (6 == adcChIdx)
 //			{ printf("\n"); }
 
-			if ((x < THREAD_VAL) && (adcStatus[adcChIdx] == 0))
+			if ((x < THREASHOLD_GND) && (adcStatus[adcChIdx] == 0))
 			{
 				char *musicP = NULL;
 				if (THREASHOLD != adcStatusCnt[adcChIdx])
-				{ adcStatusCnt[adcChIdx]++; }
+				{	adcStatusCnt[adcChIdx]++;}
 				if (THREASHOLD == adcStatusCnt[adcChIdx])
 				{
 					adcStatus[adcChIdx] = 1;
 					//printf("[%d] ON[%d]\n", adcChIdx, x);
 					switch (adcChIdx)
 					{
-					case 0:
+						case 0:
 						musicP = "./wavPlayer ./Piano/C4.wav &";
 						break;
-					case 1:
+						case 1:
 						musicP = "./wavPlayer ./--Piano/D4.wav &";
 						break;
-					case 2:
+						case 2:
 						musicP = "./wavPlayer ./Piano/E4.wav &";
 						break;
-					case 3:
+						case 3:
 						musicP = "./wavPlayer ./Piano/F4.wav &";
 						break;
-					case 4:
+						case 4:
 						musicP = "./wavPlayer ./Piano/G4.wav &";
 						break;
-					case 5:
+						case 5:
 						musicP = "./wavPlayer ./Piano/A4.wav &";
 						break;
-					case 6:
+						case 6:
 						musicP = "./wavPlayer ./Piano/B4.wav &";
 						break;
-					default:
+						default:
 						break;
 					}
 					system(musicP);
 				}
 			}
-			else if ((x >= THREAD_VAL) && (x != 4095) && (adcStatus[adcChIdx] == 1))
+			else if ((x >= THREASHOLD_GND) && (x != 4095) && (adcStatus[adcChIdx] == 1))
 			{
 				if (0 != adcStatusCnt[adcChIdx])
-				{ adcStatusCnt[adcChIdx]--; }
+				{	adcStatusCnt[adcChIdx]--;}
 				if (0 == adcStatusCnt[adcChIdx])
 				{
 					adcStatus[adcChIdx] = 0;
@@ -266,7 +315,7 @@ void adcTest(void)
 			fclose(fd);
 			usleep(1000);
 		}
-    	//printf("\n");
-    }
+		//printf("\n");
+	}
 }
 #endif
