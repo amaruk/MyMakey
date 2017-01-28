@@ -1,186 +1,122 @@
 /*********************************************************************************************************
  *
- * File                : main.cpp
- * Hardware Environment:
- * Build Environment   : Keil MDK
- * Version             : V4.74
- * By                  : WaveShare
- *
- *                                  (c) Copyright 2005-2014, WaveShare
- *                                       http://www.waveshare.net
- *                                       http://www.waveshare.com
- *                                          All Rights Reserved
+ * File                : main.c
+ * Hardware Environment: BeagleBoneBlack
+ * Build Environment   : GCC in BeagleBoneBlack
+ * Version             : V1.0
+ * By                  : Amaruk
+ *                      https://amaruk.github.io/
  *
  *********************************************************************************************************/
 #include "common.h"
-#include "lib_epd.h"
 #include "drv_adc.h"
 
-static void _base_draw(void)
-{
-	int i, j;
+/* ADC channel status: PRESS/RELEASE */
+char adcStatus[SYSFS_ADC_DIR_CHMAX] =
+{ STATUS_RELEASE, STATUS_RELEASE, STATUS_RELEASE,
+	STATUS_RELEASE, STATUS_RELEASE, STATUS_RELEASE };
+/* ADC channel press filter counter */
+char adcPressCnt[SYSFS_ADC_DIR_CHMAX] =
+{ FLT_CNT_INIT, FLT_CNT_INIT, FLT_CNT_INIT,
+	FLT_CNT_INIT, FLT_CNT_INIT, FLT_CNT_INIT };
+/* ADC channel release filter counter */
+char adcReleaseCnt[SYSFS_ADC_DIR_CHMAX] =
+{ FLT_CNT_INIT, FLT_CNT_INIT, FLT_CNT_INIT,
+	FLT_CNT_INIT, FLT_CNT_INIT, FLT_CNT_INIT };
 
-	/* draw pixel */
-	lib_epd_clear();
-	for (j = 0; j < 600; j += 50)
+void makey(void)
+{
+	int adcVal = 0; /* ADC channel value */
+	int adcChIdx = 0;
+
+	for (adcChIdx = 0; adcChIdx < SYSFS_ADC_DIR_CHMAX; adcChIdx++)
 	{
-		for (i = 0; i < 800; i += 50)
+		adcVal = adcGetChVal(adcChIdx);
+
+		/* Release status + Press detected */
+		if ((adcVal < THREASHOLD_GND) && (adcStatus[adcChIdx] == STATUS_RELEASE))
 		{
-			lib_epd_draw_pixel(i, j);
-			lib_epd_draw_pixel(i, j + 1);
-			lib_epd_draw_pixel(i + 1, j);
-			lib_epd_draw_pixel(i + 1, j + 1);
+			char *musicP = NULL;
+			/* Press filter */
+			if (FLT_CNT_PRESS > adcPressCnt[adcChIdx])
+			{
+				adcPressCnt[adcChIdx]++;
+			}
+			if (FLT_CNT_PRESS == adcPressCnt[adcChIdx])
+			{
+				adcStatus[adcChIdx] = STATUS_PRESS;
+				adcReleaseCnt[adcChIdx] = FLT_CNT_INIT;
+				//printf("[%d] ON[%d]\n", adcChIdx, adcVal);
+				/* Play the wav file */
+				switch (adcChIdx)
+				{
+				case 0:
+					musicP = "./wavPlayer ./Piano/C4.wav &";
+					break;
+				case 1:
+					musicP = "./wavPlayer ./Piano/D4.wav &";
+					break;
+				case 2:
+					musicP = "./wavPlayer ./Piano/E4.wav &";
+					break;
+				case 3:
+					musicP = "./wavPlayer ./Piano/F4.wav &";
+					break;
+				case 4:
+					musicP = "./wavPlayer ./Piano/G4.wav &";
+					break;
+				case 5:
+					musicP = "./wavPlayer ./Piano/A4.wav &";
+					break;
+				case 6:
+					musicP = "./wavPlayer ./Piano/B4.wav &";
+					break;
+				default:
+					printf("Fatal Error!\n");
+					break;
+				}
+				//printf("playing: %s\n", musicP);
+				system(musicP);
+			}
 		}
-	}
-	lib_epd_udpate();
-
-	usleep(3000000);
-
-	/* draw line */
-	lib_epd_clear();
-	for (i = 0; i < 800; i += 100)
-	{
-		lib_epd_draw_line(0, 0, i, 599);
-		lib_epd_draw_line(799, 0, i, 599);
-	}
-	lib_epd_udpate();
-	usleep(3000000);
-
-	/* fill rect */
-	lib_epd_clear();
-	lib_epd_set_color(BLACK, WHITE);
-	lib_epd_fill_rect(10, 10, 100, 100);
-
-	lib_epd_set_color(DARK_GRAY, WHITE);
-	lib_epd_fill_rect(110, 10, 200, 100);
-
-	lib_epd_set_color(GRAY, WHITE);
-	lib_epd_fill_rect(210, 10, 300, 100);
-
-	lib_epd_udpate();
-	usleep(3000000);
-
-	/* draw circle */
-	lib_epd_set_color(BLACK, WHITE);
-	lib_epd_clear();
-	for (i = 0; i < 300; i += 40)
-	{
-		lib_epd_draw_circle(399, 299, i);
-	}
-	lib_epd_udpate();
-	usleep(3000000);
-
-	/* fill circle */
-	lib_epd_clear();
-	for (j = 0; j < 6; j++)
-	{
-		for (i = 0; i < 8; i++)
+		/* Press status + Press detected */
+		else if ((adcVal < THREASHOLD_GND) && (adcStatus[adcChIdx] == STATUS_PRESS))
 		{
-			lib_epd_fill_circle(50 + i * 100, 50 + j * 100, 50);
+			adcReleaseCnt[adcChIdx] = FLT_CNT_INIT;
 		}
+		/* Press status + Release detected */
+		else if ((adcVal >= THREASHOLD_GND) && (adcVal <= THREASHOLD_VALID)
+				&& (adcStatus[adcChIdx] == STATUS_PRESS))
+		{
+			/* Release filter */
+			if (FLT_CNT_RELEASE > adcReleaseCnt[adcChIdx])
+			{
+				adcReleaseCnt[adcChIdx]++;
+			}
+			if (FLT_CNT_RELEASE == adcReleaseCnt[adcChIdx])
+			{
+				adcStatus[adcChIdx] = STATUS_RELEASE;
+				adcPressCnt[adcChIdx] = FLT_CNT_INIT;
+				//printf("[%d] OFF[%d]\n", adcChIdx, adcVal);
+			}
+		}
+		/* Release status + Release detected */
+		else if ((adcVal >= THREASHOLD_GND) && (adcVal <= THREASHOLD_VALID)
+				&& (adcStatus[adcChIdx] == STATUS_RELEASE))
+		{
+			adcPressCnt[adcChIdx] = FLT_CNT_INIT;
+		}
+
+		usleep(1000);
 	}
-	lib_epd_udpate();
-	usleep(3000000);
-
-	/* draw triangle */
-	lib_epd_clear();
-	for (i = 1; i < 5; i++)
-	{
-		lib_epd_draw_triangle(399, 249 - i * 50, 349 - i * 50, 349 + i * 50,
-				449 + i * 50, 349 + i * 50);
-	}
-	lib_epd_udpate();
-	usleep(3000000);
-}
-void draw_text_demo(void)
-{
-	lib_epd_clear();
-	printf("Set colours...\n");
-	lib_epd_set_color(BLACK, WHITE);
-	printf("Display Chinese...\n");
-	lib_epd_set_ch_font(GBK32);
-	lib_epd_disp_string("中文：狐狸", 0, 50);
-	lib_epd_set_ch_font(GBK48);
-	lib_epd_disp_string("中文：熊妈", 0, 100);
-	lib_epd_set_ch_font(GBK64);
-	lib_epd_disp_string("中文：荟雅", 0, 160);
-
-	printf("Display English...\n");
-	lib_epd_set_en_font(ASCII32);
-	lib_epd_disp_string("ASCII32: Fox!", 0, 300);
-	lib_epd_set_en_font(ASCII48);
-	lib_epd_disp_string("ASCII48: Carrie!", 0, 350);
-	lib_epd_set_en_font(ASCII64);
-	lib_epd_disp_string("ASCII64: Aya!", 0, 450);
-
-	usleep(3000000);
-	lib_epd_udpate();
-}
-void draw_bitmap_demo(void)
-{
-	lib_epd_clear();
-	lib_epd_disp_bitmap("PIC4.BMP", 0, 0);
-	lib_epd_udpate();
-	usleep(5000000);
-
-	lib_epd_clear();
-	lib_epd_disp_bitmap("PIC2.BMP", 0, 100);
-	lib_epd_disp_bitmap("PIC3.BMP", 400, 100);
-	lib_epd_udpate();
-	usleep(5000000);
-
-	lib_epd_clear();
-	lib_epd_disp_bitmap("FOXB.BMP", 0, 0);
-	lib_epd_udpate();
 }
 
-void epaperText(char *str, int x, int y)
+int main(int argc, char **argv)
 {
-	lib_epd_clear();
-	lib_epd_set_color(BLACK, WHITE);
+	adcInit();
 
-	lib_epd_set_en_font(ASCII32);
-	lib_epd_disp_string(str, x, y);
-
-	usleep(1000000);
-	lib_epd_udpate();
-}
-
-void epaperTest(void)
-{
-	lib_epd_init();
-	lib_epd_wakeup();
-
-	printf("Handshaking...\n");
-	lib_epd_handshake();
-	usleep(1000000);
-	printf("Updating...\n");
-	lib_epd_udpate();
-	lib_epd_set_memory(MEM_TF);
-
-#if 0
-	/* base Draw demo */
-	_base_draw();
-	/* Draw text demo */
-	draw_text_demo();
-	/* Draw bitmap */
-	draw_bitmap_demo();
-
-	lib_epd_clear();
-
-	lib_epd_close();
-#endif
-
-	epaperText("Hello, BBB.", 0, 300);
-
-}
-
-int main(void)
-{
-
-	//epaperTest();
-
-	adcTest();
+	for (;;)
+	{ makey(); }
 
 	exit(0);
 }
