@@ -1,20 +1,27 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <fcntl.h>
-#include <unistd.h>
+/*********************************************************************************************************
+ *
+ * File                : drv_adc.c
+ * Hardware Environment: BeagleBoneBlack
+ * Build Environment   : GCC in BeagleBoneBlack
+ * Version             : V1.0
+ * By                  : Amaruk
+ *                      https://amaruk.github.io/
+ *
+ *********************************************************************************************************/
+#include "common.h"
 #include "drv_adc.h"
 
 /* ADC device file names */
-static char *_adcChStrP[SYSFS_ADC_DIR_CHMAX] = { NULL };
+static char *_adcChStrP[SYSFS_ADC_DIR_CHMAX] =
+{ NULL };
 
 /* Get ADC channel value 0~4095 */
 int adcGetChVal(int ch)
 {
-	char adcChStr[10]; 		/* String ADC value */
-	int adcChStrLen = 0; 	/* String ADC value length */
-	int adcChInt = 0; 		/* Integer ADC value */
-	FILE *fd = NULL; 		/* Point to ADC device` file */
+	char adcChStr[10]; /* String ADC value */
+	int adcChStrLen = 0; /* String ADC value length */
+	int adcChInt = 0; /* Integer ADC value */
+	FILE *fd = NULL; /* Point to ADC device` file */
 	int idx = 0;
 
 	fd = fopen(_adcChStrP[ch], "r+");
@@ -27,38 +34,38 @@ int adcGetChVal(int ch)
 	for (idx = 0; idx < adcChStrLen; idx++)
 	{
 		/* Invalid character */
-		if (('\0' != adcChStr[idx]) &&
-			(('0' > adcChStr[idx]) ||
-			('9' < adcChStr[idx])))
+		if (('\0' != adcChStr[idx])
+				&& (('0' > adcChStr[idx]) || ('9' < adcChStr[idx])))
 		{
 			adcChStrLen = 0;
 			break;
 		}
 		/* Character to number */
 		else
-		{ adcChStr[idx] -= '0'; }
+		{
+			adcChStr[idx] -= '0';
+		}
 	}
 
 	/* Make up the int value */
 	switch (adcChStrLen)
 	{
-		case 4:
-			adcChInt = adcChStr[0] * 1000 + adcChStr[1] * 100
-					+ adcChStr[2] * 10 + adcChStr[3];
-			break;
-		case 3:
-			adcChInt = adcChStr[0] * 100 + adcChStr[1] * 10
-					+ adcChStr[2];
-			break;
-		case 2:
-			adcChInt = adcChStr[0] * 10 + adcChStr[1];
-			break;
-		case 1:
-			adcChInt = adcChStr[0];
-			break;
-		default:
-			adcChInt = THREASHOLD_VALID + 1; /* Invalid */
-			break;
+	case 4:
+		adcChInt = adcChStr[0] * 1000 + adcChStr[1] * 100 + adcChStr[2] * 10
+				+ adcChStr[3];
+		break;
+	case 3:
+		adcChInt = adcChStr[0] * 100 + adcChStr[1] * 10 + adcChStr[2];
+		break;
+	case 2:
+		adcChInt = adcChStr[0] * 10 + adcChStr[1];
+		break;
+	case 1:
+		adcChInt = adcChStr[0];
+		break;
+	default:
+		adcChInt = THREASHOLD_VALID + 1; /* Invalid */
+		break;
 	}
 
 	fclose(fd);

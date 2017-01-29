@@ -1,10 +1,13 @@
-/*
- * drv_adc.h
+/*********************************************************************************************************
  *
- *  Created on: Apr 23, 2016
- *      Author: fox
- */
-
+ * File                : drv_adc.h
+ * Hardware Environment: BeagleBoneBlack
+ * Build Environment   : GCC in BeagleBoneBlack
+ * Version             : V1.0
+ * By                  : Amaruk
+ *                      https://amaruk.github.io/
+ *
+ *********************************************************************************************************/
 #ifndef DRV_ADC_H_
 #define DRV_ADC_H_
 

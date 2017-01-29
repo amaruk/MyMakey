@@ -14,15 +14,15 @@
 /* ADC channel status: PRESS/RELEASE */
 char adcStatus[SYSFS_ADC_DIR_CHMAX] =
 { STATUS_RELEASE, STATUS_RELEASE, STATUS_RELEASE,
-	STATUS_RELEASE, STATUS_RELEASE, STATUS_RELEASE };
+STATUS_RELEASE, STATUS_RELEASE, STATUS_RELEASE };
 /* ADC channel press filter counter */
 char adcPressCnt[SYSFS_ADC_DIR_CHMAX] =
 { FLT_CNT_INIT, FLT_CNT_INIT, FLT_CNT_INIT,
-	FLT_CNT_INIT, FLT_CNT_INIT, FLT_CNT_INIT };
+FLT_CNT_INIT, FLT_CNT_INIT, FLT_CNT_INIT };
 /* ADC channel release filter counter */
 char adcReleaseCnt[SYSFS_ADC_DIR_CHMAX] =
 { FLT_CNT_INIT, FLT_CNT_INIT, FLT_CNT_INIT,
-	FLT_CNT_INIT, FLT_CNT_INIT, FLT_CNT_INIT };
+FLT_CNT_INIT, FLT_CNT_INIT, FLT_CNT_INIT };
 
 void makey(void)
 {
@@ -34,7 +34,8 @@ void makey(void)
 		adcVal = adcGetChVal(adcChIdx);
 
 		/* Release status + Press detected */
-		if ((adcVal < THREASHOLD_GND) && (adcStatus[adcChIdx] == STATUS_RELEASE))
+		if ((adcVal < THREASHOLD_GND)
+				&& (adcStatus[adcChIdx] == STATUS_RELEASE))
 		{
 			char *musicP = NULL;
 			/* Press filter */
@@ -47,6 +48,7 @@ void makey(void)
 				adcStatus[adcChIdx] = STATUS_PRESS;
 				adcReleaseCnt[adcChIdx] = FLT_CNT_INIT;
 				//printf("[%d] ON[%d]\n", adcChIdx, adcVal);
+
 				/* Play the wav file */
 				switch (adcChIdx)
 				{
@@ -80,7 +82,8 @@ void makey(void)
 			}
 		}
 		/* Press status + Press detected */
-		else if ((adcVal < THREASHOLD_GND) && (adcStatus[adcChIdx] == STATUS_PRESS))
+		else if ((adcVal < THREASHOLD_GND)
+				&& (adcStatus[adcChIdx] == STATUS_PRESS))
 		{
 			adcReleaseCnt[adcChIdx] = FLT_CNT_INIT;
 		}
@@ -116,7 +119,9 @@ int main(int argc, char **argv)
 	adcInit();
 
 	for (;;)
-	{ makey(); }
+	{
+		makey();
+	}
 
 	exit(0);
 }

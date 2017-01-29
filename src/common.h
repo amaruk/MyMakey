@@ -1,10 +1,13 @@
-/*
- * common.h
+/*********************************************************************************************************
  *
- *  Created on: Apr 8, 2016
- *      Author: fox
- */
-
+ * File                : common.h
+ * Hardware Environment: BeagleBoneBlack
+ * Build Environment   : GCC in BeagleBoneBlack
+ * Version             : V1.0
+ * By                  : Amaruk
+ *                      https://amaruk.github.io/
+ *
+ *********************************************************************************************************/
 #ifndef COMMON_H_
 #define COMMON_H_
 
