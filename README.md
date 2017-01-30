@@ -2,7 +2,6 @@
 This is a project to create Makey Makey with BeagleBoneBlack.
 By Fox/2016.04.10
 
-Test Youku video:
-<iframe height=498 width=510 src='http://player.youku.com/embed/XNDM0NDU1NDQ=' frameborder=0 'allowfullscreen'></iframe>
+[Test Youku video](http://v.youku.com/v_show/id_XNTMwMTA5OTY=.html)
 End of test
 
