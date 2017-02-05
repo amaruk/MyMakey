@@ -27,6 +27,7 @@
 First things first. Let's see how the MyMakey works:
 
 [MyMakey Youku video](https://v.youku.com/v_show/id_XMjQ5MDY1NDk3Ng==.html)
+[MyMakey Youtube video](https://youtu.be/BkRS4S57fKg)
 
 
 
